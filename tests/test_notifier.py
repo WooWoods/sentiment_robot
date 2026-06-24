@@ -16,9 +16,36 @@ def _setup_run(db_path, run_type="daily"):
     init_db(db_path)
     run_id = create_run(db_path, run_type)
     items = [
-        {"source": "yfinance_news", "ticker": None, "content": "Global news content...", "fetched_at": "2026-06-24T09:00:00"},
-        {"source": "stocktwits", "ticker": "AAPL", "content": "Bullish: 15 Bearish: 5", "fetched_at": "2026-06-24T09:00:00"},
-        {"source": "fred", "ticker": None, "content": "CPI 316.1", "fetched_at": "2026-06-24T09:00:00"},
+        {
+            "source": "yfinance_news", "ticker": None,
+            "content": "### Fed holds rates steady (source: Reuters)\nThe Federal Reserve maintained interest rates...\n### S&P 500 reaches new high (source: Bloomberg)\nMarkets rallied on tech earnings...",
+            "fetched_at": "2026-06-24T09:00:00",
+        },
+        {
+            "source": "yfinance_news", "ticker": "AAPL",
+            "content": "## AAPL News (last 7d)\n\n### Apple beats earnings estimates (source: CNBC)\nApple reported record revenue...",
+            "fetched_at": "2026-06-24T09:00:00",
+        },
+        {
+            "source": "stocktwits", "ticker": "AAPL",
+            "content": "Bullish: 15 (60%) · Bearish: 5 (20%) · Unlabeled: 5 · Total: 25 most-recent messages\n\n[2026-06-24T08:00:00Z · @trader1 · Bullish] AAPL looking strong!",
+            "fetched_at": "2026-06-24T09:00:00",
+        },
+        {
+            "source": "reddit", "ticker": "SPY",
+            "content": "r/wallstreetbets — 3 recent posts mentioning SPY:\n  [2026-06-23 · 420↑ · 85c] SPY 500c yolo update\n  [2026-06-22 · 180↑ · 42c] Anyone else buying SPY dips?",
+            "fetched_at": "2026-06-24T09:00:00",
+        },
+        {
+            "source": "fred", "ticker": None,
+            "content": "## FRED: Consumer Price Index (CPIAUCSL)\n- Units: Index 1982-84=100\n- Window: 2025-06-24 to 2026-06-24\n\n**Latest:** 316.1 (2026-06-01) | **Change:** +0.90 (+0.29%) from 315.2 (2026-05-01)\n\n| Date | Value |\n| --- | --- |\n| 2026-05-01 | 315.2 |\n| 2026-06-01 | 316.1 |",
+            "fetched_at": "2026-06-24T09:00:00",
+        },
+        {
+            "source": "prediction_markets", "ticker": None,
+            "content": "## Prediction Markets: 'Fed rate cut'\n\n### Fed cuts rates by July 2026\n  Volume: $250,001 | Ends: 2026-07-31T00:00:00Z\n    Yes: 65.0%\n    No: 35.0%\n",
+            "fetched_at": "2026-06-24T09:00:00",
+        },
     ]
     insert_raw(db_path, run_id, items)
     return run_id
@@ -53,7 +80,15 @@ def test_sends_card_on_success(mock_post, tmp_db_path):
     assert call_args[0][0] == "https://open.feishu.cn/open-apis/bot/v2/hook/test"
     payload = call_args[1]["json"]
     assert payload["msg_type"] == "interactive"
-    assert "daily" in str(payload["card"]).lower()
+    card_text = str(payload["card"]).lower()
+    assert "daily" in card_text
+    # Verify actual content is included, not just counts
+    assert "fed holds rates steady" in card_text
+    assert "apple beats earnings" in card_text
+    assert "bullish: 15" in card_text
+    assert "spy 500c yolo" in card_text
+    assert "consumer price index" in card_text
+    assert "fed cuts rates" in card_text
 
 
 @patch("sentiment_robot.notifier.requests.post")

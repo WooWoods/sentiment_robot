@@ -1,6 +1,7 @@
 """Feishu/Lark webhook notification sender."""
 
 import logging
+import re
 from datetime import datetime, timezone
 
 import requests
@@ -10,14 +11,165 @@ from .storage import get_raw_for_run, get_recent_runs
 logger = logging.getLogger(__name__)
 
 FEISHU_TIMEOUT = 10
+# Feishu card markdown elements have a practical ~4KB content limit per element
+MAX_SECTION_CHARS = 3000
 
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _extract_headlines(rows: list[dict], source: str, ticker: str | None = None) -> list[str]:
+    """Extract key lines from raw content for a given source."""
+    headlines = []
+    for row in rows:
+        if row["source"] != source:
+            continue
+        if ticker is not None and row.get("ticker") != ticker:
+            continue
+        content = row.get("content", "")
+        for line in content.split("\n"):
+            line = line.strip()
+            if not line:
+                continue
+            # Skip markdown headers, hr, table rows, and placeholder messages
+            if line.startswith("## ") or line.startswith("|") or line.startswith("<"):
+                continue
+            if line.startswith("### "):
+                headlines.append(line[4:])
+            elif line.startswith("[") and "]" in line[:30]:
+                # StockTwits: [timestamp · @user · tag] body
+                headlines.append(line)
+            elif line.startswith("Bullish:") or line.startswith("Bearish:"):
+                headlines.append(line)
+            elif re.match(r"^\d", line):
+                continue  # skip pure numbers
+        if headlines:
+            break  # first non-empty match per row
+    return headlines
+
+
+def _build_news_section(rows: list[dict], max_items: int = 6) -> str:
+    """Extract top news headlines from yfinance_news rows."""
+    lines = ["**📰 Top Headlines**"]
+    count = 0
+    for row in rows:
+        if row["source"] != "yfinance_news":
+            continue
+        content = row.get("content", "")
+        for line in content.split("\n"):
+            line = line.strip()
+            if line.startswith("### "):
+                headline = line[4:]
+                ticker_tag = f" [{row.get('ticker', '')}]" if row.get("ticker") else ""
+                lines.append(f"- {headline}{ticker_tag}")
+                count += 1
+                if count >= max_items:
+                    break
+        if count >= max_items:
+            break
+    return "\n".join(lines) if count > 0 else ""
+
+
+def _build_stocktwits_section(rows: list[dict], max_tickers: int = 5) -> str:
+    """Extract bullish/bearish ratios per ticker from StockTwits."""
+    lines = ["**💬 StockTwits Sentiment**"]
+    count = 0
+    for row in rows:
+        if row["source"] != "stocktwits":
+            continue
+        content = row.get("content", "")
+        ticker = row.get("ticker", "?")
+        # First line is the summary: "Bullish: N (X%) · Bearish: N (Y%) · Unlabeled: N · Total: N"
+        summary_line = content.split("\n")[0] if content else ""
+        if summary_line and "Bullish:" in summary_line:
+            lines.append(f"- **{ticker}**: {summary_line}")
+            count += 1
+            if count >= max_tickers:
+                break
+    return "\n".join(lines) if count > 0 else ""
+
+
+def _build_reddit_section(rows: list[dict], max_posts: int = 5) -> str:
+    """Extract top Reddit post titles."""
+    lines = ["**🐦 Reddit Discussion**"]
+    count = 0
+    for row in rows:
+        if row["source"] != "reddit":
+            continue
+        content = row.get("content", "")
+        for line in content.split("\n"):
+            stripped = line.strip()
+            if stripped.startswith("[") and "] " in stripped[:30]:
+                # Format: "  [2026-06-23 · 42↑ · 15c] Post title here"
+                lines.append(f"- {stripped.lstrip()}")
+                count += 1
+                if count >= max_posts:
+                    break
+        if count >= max_posts:
+            break
+    return "\n".join(lines) if count > 0 else ""
+
+
+def _build_fred_section(rows: list[dict], max_indicators: int = 6) -> str:
+    """Extract key macro indicator values from FRED."""
+    lines = ["**🏛️ Macro Indicators (FRED)**"]
+    count = 0
+    for row in rows:
+        if row["source"] != "fred":
+            continue
+        content = row.get("content", "")
+        indicator_name = ""
+        for line in content.split("\n"):
+            stripped = line.strip()
+            # Capture series title from header
+            if stripped.startswith("## FRED: "):
+                indicator_name = stripped[8:].split("(")[0].strip()
+            elif stripped.startswith("**Latest:**") and indicator_name:
+                lines.append(f"- **{indicator_name}**: {stripped}")
+                count += 1
+                indicator_name = ""
+                if count >= max_indicators:
+                    break
+        if count >= max_indicators:
+            break
+    return "\n".join(lines) if count > 0 else ""
+
+
+def _build_prediction_section(rows: list[dict], max_markets: int = 6) -> str:
+    """Extract top prediction market probabilities."""
+    lines = ["**🎲 Prediction Markets**"]
+    count = 0
+    for row in rows:
+        if row["source"] != "prediction_markets":
+            continue
+        content = row.get("content", "")
+        in_market = False
+        current_title = ""
+        for line in content.split("\n"):
+            stripped = line.strip()
+            if stripped.startswith("### "):
+                current_title = stripped[4:]
+                in_market = True
+            elif in_market and "%" in stripped:
+                lines.append(f"- {current_title}: {stripped.strip()}")
+                count += 1
+                in_market = False
+                if count >= max_markets:
+                    break
+        if count >= max_markets:
+            break
+    return "\n".join(lines) if count > 0 else ""
+
+
+def _truncate(text: str, max_chars: int = MAX_SECTION_CHARS) -> str:
+    if len(text) <= max_chars:
+        return text
+    return text[:max_chars] + "\n…(truncated)"
+
+
 def send_run_summary(db_path: str, run_id: int, config: dict) -> bool:
-    """Send a Feishu interactive card summarizing a pipeline run.
+    """Send a Feishu interactive card with actual news and sentiment highlights.
 
     Returns True if the message was sent successfully.
     """
@@ -31,15 +183,9 @@ def send_run_summary(db_path: str, run_id: int, config: dict) -> bool:
         return False
 
     raw_rows = get_raw_for_run(db_path, run_id)
-
-    # Count by source
-    sources = {}
-    tickers_seen = set()
-    for row in raw_rows:
-        src = row["source"]
-        sources[src] = sources.get(src, 0) + 1
-        if row.get("ticker"):
-            tickers_seen.add(row["ticker"])
+    if not raw_rows:
+        logger.warning("No raw data for run %d — skipping notification", run_id)
+        return False
 
     # Determine run type
     runs = get_recent_runs(db_path, limit=1)
@@ -49,10 +195,52 @@ def send_run_summary(db_path: str, run_id: int, config: dict) -> bool:
     color = "red" if is_breaking else "blue"
     title = "🚨 Breaking Market Alert" if is_breaking else "📊 Daily Market Sentiment"
 
-    source_lines = "\n".join(f"- {src}: {count} items" for src, count in sorted(sources.items()))
-    ticker_text = ", ".join(sorted(tickers_seen)) if tickers_seen else "macro only"
-
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    # Build card elements with actual content
+    elements = [
+        {
+            "tag": "markdown",
+            "content": f"**{now} UTC** · Run #{run_id} · {run_type.upper()}",
+        },
+    ]
+
+    # News headlines (most important — show first)
+    news_section = _build_news_section(raw_rows)
+    if news_section:
+        elements.append({"tag": "hr"})
+        elements.append({"tag": "markdown", "content": _truncate(news_section)})
+
+    # StockTwits sentiment ratios
+    st_section = _build_stocktwits_section(raw_rows)
+    if st_section:
+        elements.append({"tag": "hr"})
+        elements.append({"tag": "markdown", "content": _truncate(st_section)})
+
+    # Reddit hot posts
+    reddit_section = _build_reddit_section(raw_rows)
+    if reddit_section:
+        elements.append({"tag": "hr"})
+        elements.append({"tag": "markdown", "content": _truncate(reddit_section)})
+
+    # Macro indicators
+    fred_section = _build_fred_section(raw_rows)
+    if fred_section:
+        elements.append({"tag": "hr"})
+        elements.append({"tag": "markdown", "content": _truncate(fred_section)})
+
+    # Prediction markets
+    pred_section = _build_prediction_section(raw_rows)
+    if pred_section:
+        elements.append({"tag": "hr"})
+        elements.append({"tag": "markdown", "content": _truncate(pred_section)})
+
+    # Footer
+    elements.append({"tag": "hr"})
+    elements.append({
+        "tag": "markdown",
+        "content": f"💡 `python -m sentiment_robot report {run_id}` for LLM summary",
+    })
 
     card = {
         "msg_type": "interactive",
@@ -61,22 +249,7 @@ def send_run_summary(db_path: str, run_id: int, config: dict) -> bool:
                 "title": {"tag": "plain_text", "content": title},
                 "template": color,
             },
-            "elements": [
-                {
-                    "tag": "markdown",
-                    "content": f"**Time:** {now} (UTC)\n**Run ID:** {run_id}\n**Type:** {run_type}\n**Tickers scanned:** {ticker_text}"
-                },
-                {"tag": "hr"},
-                {
-                    "tag": "markdown",
-                    "content": f"**Data collected:**\n{source_lines}"
-                },
-                {"tag": "hr"},
-                {
-                    "tag": "markdown",
-                    "content": f"💡 Use `python -m sentiment_robot report {run_id}` to generate an LLM summary report."
-                },
-            ],
+            "elements": elements,
         },
     }
 
