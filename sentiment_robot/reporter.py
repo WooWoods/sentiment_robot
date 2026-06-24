@@ -60,7 +60,11 @@ Return ONLY the JSON object, no other text."""
 
     try:
         from openai import OpenAI
-        client = OpenAI(api_key=api_key)
+        base_url = config.get("openai_base_url")
+        client_kwargs = {"api_key": api_key}
+        if base_url:
+            client_kwargs["base_url"] = base_url
+        client = OpenAI(**client_kwargs)
         response = client.chat.completions.create(
             model=config["llm_model"],
             messages=[{"role": "user", "content": prompt}],

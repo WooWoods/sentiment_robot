@@ -22,6 +22,7 @@ DEFAULT_CONFIG = {
     "llm_provider": "openai",
     "llm_model": "gpt-4o-mini",
     "openai_api_key": None,
+    "openai_base_url": None,
     "fred_api_key": None,
     "news_per_ticker": 10,
     "global_news_limit": 15,
@@ -36,6 +37,7 @@ DEFAULT_CONFIG = {
 
 _ENV_MAP = {
     "OPENAI_API_KEY": "openai_api_key",
+    "OPENAI_BASE_URL": "openai_base_url",
     "FRED_API_KEY": "fred_api_key",
     "FEISHU_WEBHOOK_URL": "feishu_webhook_url",
     "SENTIMENT_ROBOT_LLM_ENABLED": "llm_enabled",
