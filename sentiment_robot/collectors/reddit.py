@@ -1,11 +1,13 @@
 """Reddit collector — per-ticker posts across finance subreddits."""
 
 import html
+import http.client
 import logging
 import re
 import time
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from .base import BaseCollector
@@ -13,7 +15,7 @@ from .base import BaseCollector
 logger = logging.getLogger(__name__)
 
 _RSS = "https://www.reddit.com/r/{sub}/search.rss?q={ticker}&restrict_sr=on&sort=new&t=week&limit={limit}"
-_UA = "sentiment-robot/0.1"
+_UA = "sentiment-robot/0.1 (+https://github.com/TauricResearch/TradingAgents)"
 _ATOM_NS = {"atom": "http://www.w3.org/2005/Atom"}
 
 
@@ -48,7 +50,7 @@ class RedditCollector(BaseCollector):
             total = 0
             for i, sub in enumerate(subs):
                 if i > 0:
-                    time.sleep(0.5)
+                    time.sleep(2.0)  # stay under Reddit's ~10 req/min public rate limit
                 posts = self._fetch_sub(ticker, sub, per_sub)
                 total += len(posts)
                 if not posts:
@@ -79,13 +81,28 @@ class RedditCollector(BaseCollector):
             })
         return results
 
-    def _fetch_sub(self, ticker: str, sub: str, limit: int) -> list[dict]:
+    def _fetch_sub(self, ticker: str, sub: str, limit: int, retry: bool = True) -> list[dict]:
         url = _RSS.format(sub=sub, ticker=ticker, limit=limit)
-        req = Request(url, headers={"User-Agent": _UA})
+        req = Request(url, headers={"User-Agent": _UA, "Accept": "application/atom+xml"})
         try:
             with urlopen(req, timeout=10.0) as resp:
                 root = ET.fromstring(resp.read())
-        except Exception as e:
+        except HTTPError as e:
+            if e.code == 429 and retry:
+                # Honor Reddit's Retry-After header, default to 5s if absent
+                try:
+                    wait = min(float(e.headers.get("Retry-After", 5)), 30.0)
+                except (ValueError, TypeError, AttributeError):
+                    wait = 5.0
+                logger.warning(
+                    "Reddit RSS 429 for r/%s · %s — backing off %.1fs then retrying once",
+                    sub, ticker, wait,
+                )
+                time.sleep(wait)
+                return self._fetch_sub(ticker, sub, limit, retry=False)
+            logger.warning("Reddit RSS failed for r/%s · %s: HTTP %s", sub, ticker, e.code)
+            return []
+        except (OSError, http.client.HTTPException, ET.ParseError) as e:
             logger.warning("Reddit RSS failed for r/%s · %s: %s", sub, ticker, e)
             return []
 
