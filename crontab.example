@@ -1,0 +1,15 @@
+# Sentiment Robot — example crontab entries
+#
+# Daily full scan at 8:00 AM, weekdays
+0 8 * * 1-5 cd /path/to/sentiment_robot && bash run.sh daily
+#
+# Breaking news every 2 hours during US market hours (ET)
+30 9 * * 1-5 cd /path/to/sentiment_robot && bash run.sh breaking
+30 11 * * 1-5 cd /path/to/sentiment_robot && bash run.sh breaking
+30 13 * * 1-5 cd /path/to/sentiment_robot && bash run.sh breaking
+30 15 * * 1-5 cd /path/to/sentiment_robot && bash run.sh breaking
+#
+# Windows Task Scheduler:
+# Program: python
+# Arguments: -m sentiment_robot daily
+# Start in: C:\path\to\sentiment_robot
