@@ -34,7 +34,8 @@ All settings are in `sentiment_robot/config.py` (defaults). Override via environ
 | `OPENAI_API_KEY` | `openai_api_key` | None |
 | `OPENAI_BASE_URL` | `openai_base_url` | None |
 | `FEISHU_WEBHOOK_URL` | `feishu_webhook_url` | None |
-| `SENTIMENT_ROBOT_LLM_ENABLED` | `llm_enabled` | false |
+| `SENTIMENT_ROBOT_LLM_ENABLED` | `llm_enabled` | true |
+| `SENTIMENT_ROBOT_LLM_MODEL` | `llm_model` | gpt-4o-mini |
 | `SENTIMENT_ROBOT_DB_PATH` | `db_path` | ./sentiment_robot.db |
 | `SENTIMENT_ROBOT_OUTPUT_DIR` | `output_dir` | ./output |
 

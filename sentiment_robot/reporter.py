@@ -1,4 +1,4 @@
-"""LLM-powered report generator (optional, config-gated)."""
+"""LLM-powered report generator (config-gated)."""
 
 import json
 import logging

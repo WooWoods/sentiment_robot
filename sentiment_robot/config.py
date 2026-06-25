@@ -4,7 +4,9 @@ import os
 from copy import deepcopy
 
 DEFAULT_CONFIG = {
-    "watchlist": ["SPY", "QQQ", "AAPL", "MSFT", "NVDA", "TSLA", "AMZN", "GOOGL"],
+    "watchlist": ["SPY", "QQQ", "MU", "MSFT", "NVDA", "TSLA", "AMZN", 
+                  "GOOGL", "INTC", "COHR", "AAOI", "AXTI", "RKLB"
+                  ],
     "global_news_queries": [
         "Federal Reserve interest rates inflation",
         "S&P 500 earnings GDP economic outlook",

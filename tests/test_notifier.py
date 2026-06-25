@@ -90,6 +90,8 @@ def test_sends_card_on_success(mock_post, tmp_db_path):
     assert "spy 500c yolo" in card_text.lower()
     assert "CPI" in card_text or "consumer price index" in card_text.lower()
     assert "fed cuts rates" in card_text.lower()
+    # Verify StockTwits content makes it into the card
+    assert "Bullish:" in card_text
 
 
 @patch("sentiment_robot.notifier.requests.post")

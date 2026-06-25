@@ -4,7 +4,7 @@
 0 8 * * * cd /path/to/sentiment_robot && bash run.sh daily
 #
 # Breaking news scan every 2 hours, all day
-0 */2 * * * cd /path/to/sentiment_robot && bash run.sh breaking
+17 */2 * * * cd /path/to/sentiment_robot && bash run.sh breaking
 #
 # Windows Task Scheduler:
 # Daily scan:
