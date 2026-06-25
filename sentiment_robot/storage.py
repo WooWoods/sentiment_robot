@@ -115,6 +115,18 @@ def get_raw_for_run(db_path: str, run_id: int) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def get_report_for_run(db_path: str, run_id: int) -> dict | None:
+    """Return the report for a given run, or None if none exists."""
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    row = conn.execute(
+        "SELECT * FROM reports WHERE run_id = ? ORDER BY id DESC LIMIT 1",
+        (run_id,),
+    ).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
 def get_recent_runs(db_path: str, limit: int = 10) -> list[dict]:
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row

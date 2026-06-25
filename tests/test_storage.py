@@ -100,3 +100,32 @@ def test_finish_run_sets_timestamp(tmp_db_path):
     ).fetchone()[0]
     conn.close()
     assert finished is not None
+
+
+def test_get_report_for_run_returns_none_when_no_report(tmp_db_path):
+    from sentiment_robot.storage import init_db, create_run, get_report_for_run
+    init_db(tmp_db_path)
+    run_id = create_run(tmp_db_path, "daily")
+    result = get_report_for_run(tmp_db_path, run_id)
+    assert result is None
+
+
+def test_get_report_for_run_returns_report(tmp_db_path):
+    from sentiment_robot.storage import init_db, create_run, insert_report, get_report_for_run
+    init_db(tmp_db_path)
+    run_id = create_run(tmp_db_path, "daily")
+    report = {
+        "report_type": "daily_summary",
+        "markdown_path": "/tmp/test.md",
+        "sentiment_band": "Mildly Bullish",
+        "sentiment_score": 6.5,
+        "confidence": "medium",
+        "summary": "市场情绪温和看涨...",
+        "generated_at": "2026-06-25T08:00:00",
+    }
+    insert_report(tmp_db_path, run_id, report)
+    result = get_report_for_run(tmp_db_path, run_id)
+    assert result is not None
+    assert result["sentiment_band"] == "Mildly Bullish"
+    assert result["sentiment_score"] == 6.5
+    assert result["summary"] == "市场情绪温和看涨..."
