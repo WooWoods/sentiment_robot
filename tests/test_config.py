@@ -8,15 +8,22 @@ def test_default_watchlist():
     assert "QQQ" in config["watchlist"]
 
 
-def test_default_llm_disabled():
+def test_default_llm_enabled():
+    """llm_enabled now defaults to True — LLM is required for Chinese translation."""
     config = get_config()
-    assert config["llm_enabled"] is False
+    assert config["llm_enabled"] is True
 
 
 def test_env_overrides_llm_enabled(monkeypatch):
     monkeypatch.setenv("SENTIMENT_ROBOT_LLM_ENABLED", "true")
     config = get_config()
     assert config["llm_enabled"] is True
+
+
+def test_env_overrides_llm_model(monkeypatch):
+    monkeypatch.setenv("SENTIMENT_ROBOT_LLM_MODEL", "qwen2.5:7b")
+    config = get_config()
+    assert config["llm_model"] == "qwen2.5:7b"
 
 
 def test_env_overrides_api_keys(monkeypatch):
