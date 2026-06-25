@@ -42,21 +42,21 @@ def generate_report(db_path: str, run_id: int, config: dict) -> dict | None:
 
     data_text = "\n\n".join(blocks)
 
-    prompt = f"""You are a financial market sentiment analyst. Analyze the following multi-source data and produce a structured market sentiment report.
+    prompt = f"""你是一位金融市场情绪分析师。请分析以下多源数据，生成一份结构化的市场情绪报告。
 
-## Data
+## 数据
 
 {data_text}
 
-## Instructions
+## 指令
 
-Return a JSON object with these exact keys:
-- overall_band: one of "Bullish", "Mildly Bullish", "Neutral", "Mixed", "Mildly Bearish", "Bearish"
-- overall_score: number 0-10 (0=max bearish, 5=neutral, 10=max bullish)
-- confidence: "low", "medium", or "high"
-- narrative: markdown-formatted summary with source-by-source breakdown, dominant themes, catalysts and risks, and a summary table
+返回一个 JSON 对象，包含以下键（键名必须为英文）：
+- overall_band: 以下之一 "Bullish"（看涨）, "Mildly Bullish"（温和看涨）, "Neutral"（中性）, "Mixed"（混合）, "Mildly Bearish"（温和看跌）, "Bearish"（看跌）
+- overall_score: 数字 0-10（0=极度看跌, 5=中性, 10=极度看涨）
+- confidence: "low"（低）, "medium"（中）, 或 "high"（高）
+- narrative: 用中文 Markdown 格式撰写摘要，包含：各数据源逐一分析、主导主题、催化剂与风险、总结表格
 
-Return ONLY the JSON object, no other text."""
+只返回 JSON 对象，不要包含其他文字。"""
 
     try:
         from openai import OpenAI
@@ -86,10 +86,10 @@ Return ONLY the JSON object, no other text."""
         md_path = os.path.join(output_dir, f"{date_str}-report.md")
 
         with open(md_path, "w", encoding="utf-8") as f:
-            f.write(f"# Market Sentiment Report — {date_str}\n\n")
-            f.write(f"**Overall:** {parsed['overall_band']} | ")
-            f.write(f"**Score:** {parsed['overall_score']}/10 | ")
-            f.write(f"**Confidence:** {parsed['confidence']}\n\n")
+            f.write(f"# 市场情绪报告 — {date_str}\n\n")
+            f.write(f"**整体判断：** {parsed['overall_band']} | ")
+            f.write(f"**评分：** {parsed['overall_score']}/10 | ")
+            f.write(f"**置信度：** {parsed['confidence']}\n\n")
             f.write(parsed["narrative"])
 
         return {
