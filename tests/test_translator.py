@@ -74,24 +74,24 @@ def test_translates_raw_rows_to_chinese(mock_openai):
     mock_response.choices = [MagicMock()]
     mock_response.choices[0].message.content = (
         "**\U0001f4f0 头条新闻**\n"
-        "- 美联储维持利率不变\n"
-        "- 苹果财报超预期，营收创纪录\n\n"
+        "- 美联储在最新会议上决定维持基准利率不变，鲍威尔强调需看到更多通胀降温证据才会考虑降息，市场对年内降息预期有所回落。\n"
+        "- 苹果公司最新季度财报超出华尔街预期，iPhone和服务业务收入均创历史新高，大中华区表现尤其强劲，推动股价盘后上涨5%。\n\n"
         "**\U0001f4ac StockTwits 情绪**\n"
-        "- SPY: 看涨 60% · 看跌 20%\n\n"
+        "- SPY: 看涨情绪占60%（15条），看跌仅20%（5条），整体偏向乐观，散户对大盘短期走势信心较强。\n\n"
         "**\U0001f426 Reddit 讨论**\n"
-        "- SPY 500c yolo 更新\n\n"
+        "- 用户在r/wallstreetbets发帖讨论SPY 500c期权策略，获得420点赞和85条评论，市场关注大盘指数看涨期权的风险收益比。\n\n"
         "**\U0001f3db️ 宏观指标**\n"
-        "- CPI: 316.1，环比+0.29%\n\n"
+        "- 消费者价格指数CPI最新读数为316.1，环比上涨0.29%，同比涨幅虽有放缓但仍高于美联储2%目标水平。\n\n"
         "**\U0001f3b2 预测市场**\n"
-        "- 美联储7月前降息: 是 65.0%"
+        "- 预测市场显示美联储在7月会议前降息的概率为65%，市场对宽松政策启动时点的博弈持续升温。"
     )
     mock_client.chat.completions.create.return_value = mock_response
     mock_openai.return_value = mock_client
 
     result = translate_for_feishu(_make_raw_rows(), _make_config())
     assert result is not None
-    assert "美联储维持利率不变" in result
-    assert "苹果财报超预期" in result
+    assert "美联储" in result
+    assert "苹果" in result
     assert "SPY" in result
     assert "CPI" in result
     assert "降息" in result
@@ -100,6 +100,10 @@ def test_translates_raw_rows_to_chinese(mock_openai):
     messages = call_args[1]["messages"]
     assert "Fed holds rates steady" in messages[0]["content"]
     assert "Apple beats earnings" in messages[0]["content"]
+    # Verify new prompt instructions are present
+    assert "50" in messages[0]["content"] and "100" in messages[0]["content"]
+    assert "完整内容" in messages[0]["content"]
+    assert "不要只翻译标题" in messages[0]["content"]
 
 
 @patch("openai.OpenAI")
