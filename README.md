@@ -55,10 +55,12 @@ Add to crontab:
 
 ```
 0 8 * * * cd /path/to/sentiment_robot && bash run.sh daily
-0 */2 * * * cd /path/to/sentiment_robot && bash run.sh breaking
+17 */2 * * * cd /path/to/sentiment_robot && bash run.sh breaking
 ```
 
-See `crontab.example` for more schedules including Windows Task Scheduler.
+See `crontab.example` for Windows Task Scheduler schedules.
+
+> **Note:** Feishu cards will show Chinese content only when `OPENAI_API_KEY` is configured. Without it, cards show raw English data with Chinese section headers as a fallback.
 
 ## Project Structure
 
