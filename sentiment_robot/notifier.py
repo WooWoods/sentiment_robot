@@ -168,8 +168,38 @@ def _truncate(text: str, max_chars: int = MAX_SECTION_CHARS) -> str:
     return text[:max_chars] + "\n…(truncated)"
 
 
-def send_run_summary(db_path: str, run_id: int, config: dict) -> bool:
-    """Send a Feishu interactive card with LLM Chinese summary (primary) or raw highlights (fallback).
+def _split_markdown_chunks(text: str, max_chars: int = MAX_SECTION_CHARS) -> list[str]:
+    """Split markdown text into chunks that fit Feishu card elements.
+
+    Splits on double-newline (section boundaries) where possible, then falls
+    back to hard truncation for oversized single sections.
+    """
+    chunks = []
+    for section in text.split("\n\n"):
+        section = section.strip()
+        if not section:
+            continue
+        if len(section) <= max_chars:
+            chunks.append(section)
+        else:
+            # Section too large — split on single newlines
+            for line_group in section.split("\n"):
+                line_group = line_group.strip()
+                if not line_group:
+                    continue
+                if len(line_group) <= max_chars:
+                    chunks.append(line_group)
+                else:
+                    chunks.append(line_group[:max_chars] + "\n…")
+    return chunks
+
+
+def send_run_summary(db_path: str, run_id: int, config: dict, translated_text: str | None = None) -> bool:
+    """Send a Feishu interactive card with LLM-translated Chinese content.
+
+    When translated_text is provided (per-item LLM translation), it becomes
+    the primary card body. Falls back to the global LLM report summary, then
+    to raw English data extraction.
 
     Returns True if the message was sent successfully.
     """
@@ -204,10 +234,15 @@ def send_run_summary(db_path: str, run_id: int, config: dict) -> bool:
         },
     ]
 
-    # Try to use LLM Chinese report as primary content
+    # Card body: translated text > LLM report > raw data extraction
     report = get_report_for_run(db_path, run_id)
-    if report and report.get("summary"):
-        # LLM report available — show Chinese sentiment summary as the main content
+    if translated_text:
+        # Tier 1: Per-item LLM Chinese translation — the gold standard
+        for chunk in _split_markdown_chunks(translated_text):
+            elements.append({"tag": "hr"})
+            elements.append({"tag": "markdown", "content": chunk})
+    elif report and report.get("summary"):
+        # Tier 2: Global LLM sentiment report (Chinese)
         band = report.get("sentiment_band", "?")
         score = report.get("sentiment_score", "?")
         confidence = report.get("confidence", "?")
@@ -223,7 +258,7 @@ def send_run_summary(db_path: str, run_id: int, config: dict) -> bool:
             "content": _truncate(report["summary"]),
         })
     else:
-        # No LLM report — fall back to raw data highlights
+        # Tier 3: Raw English data extraction (legacy fallback)
         news_section = _build_news_section(raw_rows)
         if news_section:
             elements.append({"tag": "hr"})
@@ -251,7 +286,12 @@ def send_run_summary(db_path: str, run_id: int, config: dict) -> bool:
 
     # Footer
     elements.append({"tag": "hr"})
-    if report and report.get("summary"):
+    if translated_text:
+        elements.append({
+            "tag": "markdown",
+            "content": "🤖 以上内容由 LLM 逐条翻译生成，仅供参考",
+        })
+    elif report and report.get("summary"):
         elements.append({
             "tag": "markdown",
             "content": "🤖 以上内容由 LLM 自动生成，仅供参考",

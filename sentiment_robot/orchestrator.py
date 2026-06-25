@@ -8,9 +8,10 @@ from .collectors.stocktwits import StocktwitsCollector
 from .collectors.reddit import RedditCollector
 from .collectors.fred import FredCollector
 from .collectors.prediction_markets import PredictionMarketsCollector
-from .storage import init_db, create_run, finish_run, insert_raw, insert_report
+from .storage import init_db, create_run, finish_run, insert_raw, insert_report, get_raw_for_run
 from .reporter import generate_report
 from .notifier import send_run_summary
+from .translator import translate_for_feishu
 
 logger = logging.getLogger(__name__)
 
@@ -72,17 +73,25 @@ def run_pipeline(run_type: str, config: dict) -> int:
         if batch:
             insert_raw(db_path, run_id, batch)
 
-    # Optional LLM report
+    # Optional LLM report (global sentiment)
     if llm_enabled:
         report = generate_report(db_path, run_id, config)
         if report:
             insert_report(db_path, run_id, report)
             logger.info("LLM report generated for run %d — %s", run_id, report.get("sentiment_band", "?"))
 
+    # LLM translation for Feishu card (per-item Chinese summaries)
+    translated_text = None
+    if llm_enabled:
+        raw_rows = get_raw_for_run(db_path, run_id)
+        translated_text = translate_for_feishu(raw_rows, config)
+        if translated_text:
+            logger.info("LLM translation ready for run %d (%d chars)", run_id, len(translated_text))
+
     finish_run(db_path, run_id)
 
     # Feishu notification (best-effort, after everything else)
-    send_run_summary(db_path, run_id, config)
+    send_run_summary(db_path, run_id, config, translated_text=translated_text)
 
     logger.info("Pipeline run %d complete", run_id)
     return 0

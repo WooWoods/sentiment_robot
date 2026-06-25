@@ -73,7 +73,7 @@ def test_sends_card_on_success(mock_post, tmp_db_path):
     mock_resp.json.return_value = {"code": 0, "msg": "success"}
     mock_post.return_value = mock_resp
 
-    result = send_run_summary(tmp_db_path, run_id, _make_config())
+    result = send_run_summary(tmp_db_path, run_id, _make_config(), translated_text=None)
     assert result is True
     mock_post.assert_called_once()
     call_args = mock_post.call_args
@@ -153,3 +153,35 @@ def test_sends_card_with_llm_report(mock_post, tmp_db_path):
     # Should NOT contain raw data sections (LLM summary replaces them)
     assert "头条新闻" not in card_text
     assert "StockTwits 情绪" not in card_text
+
+
+@patch("sentiment_robot.notifier.requests.post")
+def test_sends_card_with_translated_text(mock_post, tmp_db_path):
+    """When translated_text is provided, it becomes the primary card body."""
+    run_id = _setup_run(tmp_db_path)
+    translated = (
+        "**📰 头条新闻**\n"
+        "- 美联储维持利率不变\n"
+        "- 苹果财报超预期，营收创纪录\n\n"
+        "**💬 StockTwits 情绪**\n"
+        "- SPY: 看涨 60% · 看跌 20%"
+    )
+
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {"code": 0, "msg": "success"}
+    mock_post.return_value = mock_resp
+
+    result = send_run_summary(tmp_db_path, run_id, _make_config(), translated_text=translated)
+    assert result is True
+
+    payload = mock_post.call_args[1]["json"]
+    card_text = str(payload["card"])
+    # Should contain the Chinese translation
+    assert "美联储维持利率不变" in card_text
+    assert "苹果财报超预期" in card_text
+    assert "看涨 60%" in card_text
+    # Should have the translation footer
+    assert "逐条翻译" in card_text
+    # Should NOT contain raw English extraction
+    assert "Fed holds rates steady" not in card_text.lower()

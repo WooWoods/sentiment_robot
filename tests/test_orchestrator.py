@@ -28,12 +28,14 @@ def _make_config(**overrides):
     return base
 
 
+@patch("sentiment_robot.orchestrator.translate_for_feishu")
 @patch("sentiment_robot.orchestrator.YFinanceNewsCollector")
 @patch("sentiment_robot.orchestrator.StocktwitsCollector")
 @patch("sentiment_robot.orchestrator.RedditCollector")
 @patch("sentiment_robot.orchestrator.PredictionMarketsCollector")
 @patch("sentiment_robot.orchestrator.FredCollector")
-def test_daily_runs_all_collectors(mock_fred, mock_poly, mock_reddit, mock_st, mock_yf, tmp_db_path):
+def test_daily_runs_all_collectors(mock_fred, mock_poly, mock_reddit, mock_st, mock_yf, mock_translate, tmp_db_path):
+    mock_translate.return_value = None
     for mock_cls in [mock_fred, mock_poly, mock_reddit, mock_st, mock_yf]:
         instance = MagicMock()
         instance.run.return_value = [
@@ -46,9 +48,11 @@ def test_daily_runs_all_collectors(mock_fred, mock_poly, mock_reddit, mock_st, m
     assert exit_code == 0
 
 
+@patch("sentiment_robot.orchestrator.translate_for_feishu")
 @patch("sentiment_robot.orchestrator.YFinanceNewsCollector")
 @patch("sentiment_robot.orchestrator.StocktwitsCollector")
-def test_breaking_runs_only_two_collectors(mock_st, mock_yf, tmp_db_path):
+def test_breaking_runs_only_two_collectors(mock_st, mock_yf, mock_translate, tmp_db_path):
+    mock_translate.return_value = None
     for mock_cls in [mock_st, mock_yf]:
         instance = MagicMock()
         instance.run.return_value = [
