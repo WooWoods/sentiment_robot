@@ -101,7 +101,7 @@ def test_translates_raw_rows_to_chinese(mock_openai):
     assert "Fed holds rates steady" in messages[0]["content"]
     assert "Apple beats earnings" in messages[0]["content"]
     # Verify new prompt instructions are present
-    assert "50" in messages[0]["content"] and "100" in messages[0]["content"]
+    assert "50-100" in messages[0]["content"]
     assert "完整内容" in messages[0]["content"]
     assert "不要只翻译标题" in messages[0]["content"]
 
