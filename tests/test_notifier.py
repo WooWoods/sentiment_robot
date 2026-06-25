@@ -1,5 +1,5 @@
 from unittest.mock import patch, MagicMock
-from sentiment_robot.storage import init_db, create_run, insert_raw
+from sentiment_robot.storage import init_db, create_run, insert_raw, insert_report
 from sentiment_robot.notifier import send_run_summary
 
 
@@ -116,3 +116,40 @@ def test_handles_webhook_failure(mock_post, tmp_db_path):
     mock_post.side_effect = Exception("Connection refused")
     result = send_run_summary(tmp_db_path, run_id, _make_config())
     assert result is False
+
+
+@patch("sentiment_robot.notifier.requests.post")
+def test_sends_card_with_llm_report(mock_post, tmp_db_path):
+    """When LLM report exists, card shows Chinese summary as primary content."""
+    run_id = _setup_run(tmp_db_path)
+    # Insert a mock LLM report with Chinese content
+    insert_report(tmp_db_path, run_id, {
+        "report_type": "daily_summary",
+        "markdown_path": "/tmp/test.md",
+        "sentiment_band": "Mildly Bullish",
+        "sentiment_score": 6.5,
+        "confidence": "medium",
+        "summary": "市场情绪温和看涨，科技股表现强劲，但宏观指标显示通胀压力仍在...",
+        "generated_at": "2026-06-25T08:00:00",
+    })
+
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {"code": 0, "msg": "success"}
+    mock_post.return_value = mock_resp
+
+    result = send_run_summary(tmp_db_path, run_id, _make_config())
+    assert result is True
+
+    payload = mock_post.call_args[1]["json"]
+    card_text = str(payload["card"])
+    # Should contain Chinese LLM summary
+    assert "市场情绪温和看涨" in card_text
+    assert "科技股表现强劲" in card_text
+    assert "Mildly Bullish" in card_text
+    assert "6.5" in card_text
+    # Should have LLM footer, not the fallback footer
+    assert "LLM 自动生成" in card_text
+    # Should NOT contain raw data sections (LLM summary replaces them)
+    assert "头条新闻" not in card_text
+    assert "StockTwits 情绪" not in card_text

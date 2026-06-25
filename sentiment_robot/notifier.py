@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 import requests
 
-from .storage import get_raw_for_run, get_recent_runs
+from .storage import get_raw_for_run, get_recent_runs, get_report_for_run
 
 logger = logging.getLogger(__name__)
 
@@ -169,7 +169,7 @@ def _truncate(text: str, max_chars: int = MAX_SECTION_CHARS) -> str:
 
 
 def send_run_summary(db_path: str, run_id: int, config: dict) -> bool:
-    """Send a Feishu interactive card with actual news and sentiment highlights.
+    """Send a Feishu interactive card with LLM Chinese summary (primary) or raw highlights (fallback).
 
     Returns True if the message was sent successfully.
     """
@@ -197,7 +197,6 @@ def send_run_summary(db_path: str, run_id: int, config: dict) -> bool:
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-    # Build card elements with actual content
     elements = [
         {
             "tag": "markdown",
@@ -205,42 +204,63 @@ def send_run_summary(db_path: str, run_id: int, config: dict) -> bool:
         },
     ]
 
-    # News headlines (most important — show first)
-    news_section = _build_news_section(raw_rows)
-    if news_section:
-        elements.append({"tag": "hr"})
-        elements.append({"tag": "markdown", "content": _truncate(news_section)})
+    # Try to use LLM Chinese report as primary content
+    report = get_report_for_run(db_path, run_id)
+    if report and report.get("summary"):
+        # LLM report available — show Chinese sentiment summary as the main content
+        band = report.get("sentiment_band", "?")
+        score = report.get("sentiment_score", "?")
+        confidence = report.get("confidence", "?")
 
-    # StockTwits sentiment ratios
-    st_section = _build_stocktwits_section(raw_rows)
-    if st_section:
         elements.append({"tag": "hr"})
-        elements.append({"tag": "markdown", "content": _truncate(st_section)})
+        elements.append({
+            "tag": "markdown",
+            "content": f"**整体判断：** {band} | **评分：** {score}/10 | **置信度：** {confidence}",
+        })
+        elements.append({"tag": "hr"})
+        elements.append({
+            "tag": "markdown",
+            "content": _truncate(report["summary"]),
+        })
+    else:
+        # No LLM report — fall back to raw data highlights
+        news_section = _build_news_section(raw_rows)
+        if news_section:
+            elements.append({"tag": "hr"})
+            elements.append({"tag": "markdown", "content": _truncate(news_section)})
 
-    # Reddit hot posts
-    reddit_section = _build_reddit_section(raw_rows)
-    if reddit_section:
-        elements.append({"tag": "hr"})
-        elements.append({"tag": "markdown", "content": _truncate(reddit_section)})
+        st_section = _build_stocktwits_section(raw_rows)
+        if st_section:
+            elements.append({"tag": "hr"})
+            elements.append({"tag": "markdown", "content": _truncate(st_section)})
 
-    # Macro indicators
-    fred_section = _build_fred_section(raw_rows)
-    if fred_section:
-        elements.append({"tag": "hr"})
-        elements.append({"tag": "markdown", "content": _truncate(fred_section)})
+        reddit_section = _build_reddit_section(raw_rows)
+        if reddit_section:
+            elements.append({"tag": "hr"})
+            elements.append({"tag": "markdown", "content": _truncate(reddit_section)})
 
-    # Prediction markets
-    pred_section = _build_prediction_section(raw_rows)
-    if pred_section:
-        elements.append({"tag": "hr"})
-        elements.append({"tag": "markdown", "content": _truncate(pred_section)})
+        fred_section = _build_fred_section(raw_rows)
+        if fred_section:
+            elements.append({"tag": "hr"})
+            elements.append({"tag": "markdown", "content": _truncate(fred_section)})
+
+        pred_section = _build_prediction_section(raw_rows)
+        if pred_section:
+            elements.append({"tag": "hr"})
+            elements.append({"tag": "markdown", "content": _truncate(pred_section)})
 
     # Footer
     elements.append({"tag": "hr"})
-    elements.append({
-        "tag": "markdown",
-        "content": f"💡 `python -m sentiment_robot report {run_id}` 查看 LLM 中文摘要",
-    })
+    if report and report.get("summary"):
+        elements.append({
+            "tag": "markdown",
+            "content": "🤖 以上内容由 LLM 自动生成，仅供参考",
+        })
+    else:
+        elements.append({
+            "tag": "markdown",
+            "content": f"💡 `python -m sentiment_robot report {run_id}` 查看 LLM 中文摘要",
+        })
 
     card = {
         "msg_type": "interactive",
