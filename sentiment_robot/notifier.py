@@ -51,7 +51,7 @@ def _extract_headlines(rows: list[dict], source: str, ticker: str | None = None)
 
 def _build_news_section(rows: list[dict], max_items: int = 6) -> str:
     """Extract top news headlines from yfinance_news rows."""
-    lines = ["**📰 Top Headlines**"]
+    lines = ["**📰 头条新闻**"]
     count = 0
     for row in rows:
         if row["source"] != "yfinance_news":
@@ -73,7 +73,7 @@ def _build_news_section(rows: list[dict], max_items: int = 6) -> str:
 
 def _build_stocktwits_section(rows: list[dict], max_tickers: int = 5) -> str:
     """Extract bullish/bearish ratios per ticker from StockTwits."""
-    lines = ["**💬 StockTwits Sentiment**"]
+    lines = ["**💬 StockTwits 情绪**"]
     count = 0
     for row in rows:
         if row["source"] != "stocktwits":
@@ -92,7 +92,7 @@ def _build_stocktwits_section(rows: list[dict], max_tickers: int = 5) -> str:
 
 def _build_reddit_section(rows: list[dict], max_posts: int = 5) -> str:
     """Extract top Reddit post titles."""
-    lines = ["**🐦 Reddit Discussion**"]
+    lines = ["**🐦 Reddit 讨论**"]
     count = 0
     for row in rows:
         if row["source"] != "reddit":
@@ -113,7 +113,7 @@ def _build_reddit_section(rows: list[dict], max_posts: int = 5) -> str:
 
 def _build_fred_section(rows: list[dict], max_indicators: int = 6) -> str:
     """Extract key macro indicator values from FRED."""
-    lines = ["**🏛️ Macro Indicators (FRED)**"]
+    lines = ["**🏛️ 宏观指标 (FRED)**"]
     count = 0
     for row in rows:
         if row["source"] != "fred":
@@ -138,7 +138,7 @@ def _build_fred_section(rows: list[dict], max_indicators: int = 6) -> str:
 
 def _build_prediction_section(rows: list[dict], max_markets: int = 6) -> str:
     """Extract top prediction market probabilities."""
-    lines = ["**🎲 Prediction Markets**"]
+    lines = ["**🎲 预测市场**"]
     count = 0
     for row in rows:
         if row["source"] != "prediction_markets":
@@ -193,7 +193,7 @@ def send_run_summary(db_path: str, run_id: int, config: dict) -> bool:
 
     is_breaking = run_type == "breaking"
     color = "red" if is_breaking else "blue"
-    title = "🚨 Breaking Market Alert" if is_breaking else "📊 Daily Market Sentiment"
+    title = "🚨 突发市场警报" if is_breaking else "📊 每日市场情绪"
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
 
@@ -201,7 +201,7 @@ def send_run_summary(db_path: str, run_id: int, config: dict) -> bool:
     elements = [
         {
             "tag": "markdown",
-            "content": f"**{now} UTC** · Run #{run_id} · {run_type.upper()}",
+            "content": f"**{now} UTC** · 运行 #{run_id} · {run_type.upper()}",
         },
     ]
 
@@ -239,7 +239,7 @@ def send_run_summary(db_path: str, run_id: int, config: dict) -> bool:
     elements.append({"tag": "hr"})
     elements.append({
         "tag": "markdown",
-        "content": f"💡 `python -m sentiment_robot report {run_id}` for LLM summary",
+        "content": f"💡 `python -m sentiment_robot report {run_id}` 查看 LLM 中文摘要",
     })
 
     card = {

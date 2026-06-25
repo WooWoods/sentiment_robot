@@ -80,15 +80,16 @@ def test_sends_card_on_success(mock_post, tmp_db_path):
     assert call_args[0][0] == "https://open.feishu.cn/open-apis/bot/v2/hook/test"
     payload = call_args[1]["json"]
     assert payload["msg_type"] == "interactive"
-    card_text = str(payload["card"]).lower()
-    assert "daily" in card_text
-    # Verify actual content is included, not just counts
-    assert "fed holds rates steady" in card_text
-    assert "apple beats earnings" in card_text
-    assert "bullish: 15" in card_text
-    assert "spy 500c yolo" in card_text
-    assert "consumer price index" in card_text
-    assert "fed cuts rates" in card_text
+    card_text = str(payload["card"])
+    # Chinese card title for daily mode
+    assert "每日市场情绪" in card_text
+    # Verify actual content is still included (titles now in Chinese)
+    assert "fed holds rates steady" in card_text.lower()
+    assert "apple beats earnings" in card_text.lower()
+    assert "AAPL" in card_text
+    assert "spy 500c yolo" in card_text.lower()
+    assert "CPI" in card_text or "consumer price index" in card_text.lower()
+    assert "fed cuts rates" in card_text.lower()
 
 
 @patch("sentiment_robot.notifier.requests.post")
@@ -102,7 +103,9 @@ def test_breaking_mode_uses_red_color(mock_post, tmp_db_path):
     result = send_run_summary(tmp_db_path, run_id, _make_config())
     assert result is True
     payload = mock_post.call_args[1]["json"]
-    assert "red" in str(payload["card"]).lower()
+    card_text = str(payload["card"])
+    assert "red" in card_text.lower()
+    assert "突发市场警报" in card_text
 
 
 @patch("sentiment_robot.notifier.requests.post")
