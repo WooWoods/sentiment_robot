@@ -53,10 +53,11 @@ All settings are in `sentiment_robot/config.py` (defaults). Override via environ
 Add to crontab:
 
 ```
-0 8 * * 1-5 cd /app && bash run.sh daily
+0 8 * * * cd /path/to/sentiment_robot && bash run.sh daily
+0 */2 * * * cd /path/to/sentiment_robot && bash run.sh breaking
 ```
 
-See `crontab.example` for more schedules.
+See `crontab.example` for more schedules including Windows Task Scheduler.
 
 ## Project Structure
 
