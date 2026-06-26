@@ -20,12 +20,14 @@ def _make_mock_collector(name="test"):
     return instance
 
 
+@patch("sentiment_robot.orchestrator.filter_stock_related")
 @patch("sentiment_robot.orchestrator.PredictionMarketsCollector")
 @patch("sentiment_robot.orchestrator.FredCollector")
 @patch("sentiment_robot.orchestrator.RedditCollector")
 @patch("sentiment_robot.orchestrator.StocktwitsCollector")
 @patch("sentiment_robot.orchestrator.YFinanceNewsCollector")
-def test_full_daily_pipeline(mock_yf, mock_st, mock_reddit, mock_fred, mock_poly, tmp_db_path):
+def test_full_daily_pipeline(mock_yf, mock_st, mock_reddit, mock_fred, mock_poly, mock_filter, tmp_db_path):
+    mock_filter.side_effect = lambda rows, config: rows
     """Daily pipeline: all 5 collectors run, data stored, run tracked."""
     mock_yf.return_value = _make_mock_collector("yfinance_news")
     mock_st.return_value = _make_mock_collector("stocktwits")
@@ -51,9 +53,11 @@ def test_full_daily_pipeline(mock_yf, mock_st, mock_reddit, mock_fred, mock_poly
     assert sources == {"yfinance_news", "stocktwits", "reddit", "fred", "prediction_markets"}
 
 
+@patch("sentiment_robot.orchestrator.filter_stock_related")
 @patch("sentiment_robot.orchestrator.StocktwitsCollector")
 @patch("sentiment_robot.orchestrator.YFinanceNewsCollector")
-def test_full_breaking_pipeline(mock_yf, mock_st, tmp_db_path):
+def test_full_breaking_pipeline(mock_yf, mock_st, mock_filter, tmp_db_path):
+    mock_filter.side_effect = lambda rows, config: rows
     """Breaking pipeline: only 2 collectors run, data stored."""
     mock_yf.return_value = _make_mock_collector("yfinance_news")
     mock_st.return_value = _make_mock_collector("stocktwits")

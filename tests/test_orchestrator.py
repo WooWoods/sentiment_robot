@@ -29,13 +29,15 @@ def _make_config(**overrides):
 
 
 @patch("sentiment_robot.orchestrator.translate_for_feishu")
+@patch("sentiment_robot.orchestrator.filter_stock_related")
 @patch("sentiment_robot.orchestrator.YFinanceNewsCollector")
 @patch("sentiment_robot.orchestrator.StocktwitsCollector")
 @patch("sentiment_robot.orchestrator.RedditCollector")
 @patch("sentiment_robot.orchestrator.PredictionMarketsCollector")
 @patch("sentiment_robot.orchestrator.FredCollector")
-def test_daily_runs_all_collectors(mock_fred, mock_poly, mock_reddit, mock_st, mock_yf, mock_translate, tmp_db_path):
+def test_daily_runs_all_collectors(mock_fred, mock_poly, mock_reddit, mock_st, mock_yf, mock_filter, mock_translate, tmp_db_path):
     mock_translate.return_value = None
+    mock_filter.side_effect = lambda rows, config: rows
     for mock_cls in [mock_fred, mock_poly, mock_reddit, mock_st, mock_yf]:
         instance = MagicMock()
         instance.run.return_value = [
@@ -49,10 +51,12 @@ def test_daily_runs_all_collectors(mock_fred, mock_poly, mock_reddit, mock_st, m
 
 
 @patch("sentiment_robot.orchestrator.translate_for_feishu")
+@patch("sentiment_robot.orchestrator.filter_stock_related")
 @patch("sentiment_robot.orchestrator.YFinanceNewsCollector")
 @patch("sentiment_robot.orchestrator.StocktwitsCollector")
-def test_breaking_runs_only_two_collectors(mock_st, mock_yf, mock_translate, tmp_db_path):
+def test_breaking_runs_only_two_collectors(mock_st, mock_yf, mock_filter, mock_translate, tmp_db_path):
     mock_translate.return_value = None
+    mock_filter.side_effect = lambda rows, config: rows
     for mock_cls in [mock_st, mock_yf]:
         instance = MagicMock()
         instance.run.return_value = [
@@ -86,10 +90,14 @@ def test_continues_on_collector_failure(mock_st, mock_yf, tmp_db_path):
     assert exit_code == 0  # still succeeds
 
 
+@patch("sentiment_robot.orchestrator.translate_for_feishu")
+@patch("sentiment_robot.orchestrator.filter_stock_related")
 @patch("sentiment_robot.orchestrator.generate_report")
 @patch("sentiment_robot.orchestrator.YFinanceNewsCollector")
 @patch("sentiment_robot.orchestrator.StocktwitsCollector")
-def test_llm_called_when_enabled(mock_st, mock_yf, mock_reporter, tmp_db_path):
+def test_llm_called_when_enabled(mock_st, mock_yf, mock_reporter, mock_filter, mock_translate, tmp_db_path):
+    mock_translate.return_value = None
+    mock_filter.side_effect = lambda rows, config: rows
     for mock_cls in [mock_st, mock_yf]:
         instance = MagicMock()
         instance.run.return_value = [
@@ -106,6 +114,7 @@ def test_llm_called_when_enabled(mock_st, mock_yf, mock_reporter, tmp_db_path):
     exit_code = run_pipeline("daily", config)
     assert exit_code == 0
     mock_reporter.assert_called_once()
+    mock_filter.assert_called()
 
 
 @patch("sentiment_robot.orchestrator.send_run_summary")
