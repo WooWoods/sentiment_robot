@@ -14,8 +14,14 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def generate_report(db_path: str, run_id: int, config: dict) -> dict | None:
+def generate_report(db_path: str, run_id: int, config: dict, raw_rows: list[dict] | None = None) -> dict | None:
     """Generate an LLM sentiment report for a pipeline run.
+
+    Args:
+        db_path: Path to SQLite database.
+        run_id: Pipeline run ID.
+        config: Merged config dict.
+        raw_rows: Optional pre-fetched filtered rows. If None, fetches from DB.
 
     Returns None if LLM is disabled, not configured, or fails.
     Returns a report dict on success, ready for storage.insert_report().
@@ -28,7 +34,9 @@ def generate_report(db_path: str, run_id: int, config: dict) -> dict | None:
         logger.info("LLM enabled but no OPENAI_API_KEY set — skipping report")
         return None
 
-    raw_rows = get_raw_for_run(db_path, run_id)
+    if raw_rows is None:
+        raw_rows = get_raw_for_run(db_path, run_id)
+
     if not raw_rows:
         logger.warning("No raw data for run %d — skipping report", run_id)
         return None
