@@ -21,6 +21,7 @@ DEFAULT_CONFIG = {
     "prediction_topics": ["Fed rate cut", "recession", "US election", "oil prices"],
     "reddit_subs": ["wallstreetbets", "stocks", "investing", "StockMarket"],
     "llm_enabled": True,
+    "llm_filter_enabled": True,
     "llm_provider": "openai",
     "llm_model": "gpt-4o-mini",
     "openai_api_key": None,
@@ -44,6 +45,7 @@ _ENV_MAP = {
     "FRED_API_KEY": "fred_api_key",
     "FEISHU_WEBHOOK_URL": "feishu_webhook_url",
     "SENTIMENT_ROBOT_LLM_ENABLED": "llm_enabled",
+    "SENTIMENT_ROBOT_LLM_FILTER_ENABLED": "llm_filter_enabled",
     "SENTIMENT_ROBOT_DB_PATH": "db_path",
     "SENTIMENT_ROBOT_OUTPUT_DIR": "output_dir",
 }
